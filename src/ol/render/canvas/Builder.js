@@ -287,7 +287,7 @@ class CanvasBuilder extends VectorContext {
       ]);
     } else if (
       type == GeometryType.LINE_STRING ||
-      type == GeometryType.MULTI_POINT
+      type == GeometryType.CIRCLE
     ) {
       flatCoordinates = geometry.getFlatCoordinates();
       builderEnd = this.appendFlatCoordinates(
@@ -316,26 +316,6 @@ class CanvasBuilder extends VectorContext {
         builderEnd,
         geometry,
         renderer,
-      ]);
-    } else if (type == GeometryType.CIRCLE) {
-      const flatCoordinates = geometry.getFlatCoordinates();
-      this.appendFlatCoordinates(
-        flatCoordinates,
-        0,
-        flatCoordinates.length,
-        stride,
-        false,
-        false
-      );
-      builderEnd = this.coordinates.length;
-      this.instructions.push([
-        CanvasInstruction.CUSTOM,
-        builderBegin,
-        builderEnd,
-        geometry,
-        renderer,
-        undefined,
-        4,
       ]);
     }
     this.endGeometry(feature);
