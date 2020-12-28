@@ -75,9 +75,10 @@ describe('ol.interaction.Draw', function () {
    * @param {number} x Horizontal offset from map center.
    * @param {number} y Vertical offset from map center.
    * @param {boolean=} opt_shiftKey Shift key is pressed.
+   * @param {boolean=} opt_pointerId Pointer id.
    * @return {module:ol/MapBrowserEvent} The simulated event.
    */
-  function simulateEvent(type, x, y, opt_shiftKey) {
+  function simulateEvent(type, x, y, opt_shiftKey, opt_pointerId = 0) {
     const viewport = map.getViewport();
     // calculated in case body has top < 0 (test runner with small window)
     const position = viewport.getBoundingClientRect();
@@ -90,7 +91,7 @@ describe('ol.interaction.Draw', function () {
     event.shiftKey = shiftKey;
     event.preventDefault = function () {};
     event.pointerType = 'mouse';
-    event.pointerId = 0;
+    event.pointerId = opt_pointerId;
     const simulatedEvent = new MapBrowserEvent(type, map, event);
     map.handleMapBrowserEvent(simulatedEvent);
     return simulatedEvent;
@@ -215,6 +216,17 @@ describe('ol.interaction.Draw', function () {
       simulateEvent('pointermove', 10, 20);
       simulateEvent('pointerdown', 10, 20, true);
       simulateEvent('pointerup', 10, 20);
+      const features = source.getFeatures();
+      expect(features).to.have.length(0);
+    });
+
+    it('does not draw a point when multiple pointers are involved', function () {
+      simulateEvent('pointerdown', 10, 20, false, 1);
+      simulateEvent('pointerdown', 10, 20, false, 2);
+      simulateEvent('pointermove', 10, 30, false, 1);
+      simulateEvent('pointermove', 10, 10, false, 2);
+      simulateEvent('pointerup', 10, 30, false, 1);
+      simulateEvent('pointerup', 10, 10, false, 2);
       const features = source.getFeatures();
       expect(features).to.have.length(0);
     });
@@ -1349,6 +1361,33 @@ describe('ol.interaction.Draw', function () {
       const draw = new Draw({
         source: source,
         type: 'Circle',
+        geometryFunction: createRegularPolygon(4),
+      });
+      map.addInteraction(draw);
+
+      // first point
+      simulateEvent('pointermove', 0, 0);
+      simulateEvent('pointerdown', 0, 0);
+      simulateEvent('pointerup', 0, 0);
+
+      // finish on second point
+      simulateEvent('pointermove', 20, 20);
+      simulateEvent('pointerdown', 20, 20);
+      simulateEvent('pointerup', 20, 20);
+
+      const features = source.getFeatures();
+      const geometry = features[0].getGeometry();
+      expect(geometry).to.be.a(Polygon);
+      const coordinates = geometry.getCoordinates();
+      expect(coordinates[0].length).to.eql(5);
+      expect(coordinates[0][0][0]).to.roughlyEqual(20, 1e-9);
+      expect(coordinates[0][0][1]).to.roughlyEqual(-20, 1e-9);
+    });
+
+    it('creates a regular polygon at specified angle', function () {
+      const draw = new Draw({
+        source: source,
+        type: 'Circle',
         geometryFunction: createRegularPolygon(4, Math.PI / 4),
       });
       map.addInteraction(draw);
@@ -1370,6 +1409,33 @@ describe('ol.interaction.Draw', function () {
       expect(coordinates[0].length).to.eql(5);
       expect(coordinates[0][0][0]).to.roughlyEqual(20, 1e-9);
       expect(coordinates[0][0][1]).to.roughlyEqual(20, 1e-9);
+    });
+
+    it('creates a regular polygon at specified 0 angle', function () {
+      const draw = new Draw({
+        source: source,
+        type: 'Circle',
+        geometryFunction: createRegularPolygon(4, 0),
+      });
+      map.addInteraction(draw);
+
+      // first point
+      simulateEvent('pointermove', 0, 0);
+      simulateEvent('pointerdown', 0, 0);
+      simulateEvent('pointerup', 0, 0);
+
+      // finish on second point
+      simulateEvent('pointermove', 20, 20);
+      simulateEvent('pointerdown', 20, 20);
+      simulateEvent('pointerup', 20, 20);
+
+      const features = source.getFeatures();
+      const geometry = features[0].getGeometry();
+      expect(geometry).to.be.a(Polygon);
+      const coordinates = geometry.getCoordinates();
+      expect(coordinates[0].length).to.eql(5);
+      expect(coordinates[0][0][0]).to.roughlyEqual(28.2842712474619, 1e-9);
+      expect(coordinates[0][0][1]).to.roughlyEqual(0, 1e-9);
     });
 
     it('creates a regular polygon in Circle mode in a user projection', function () {

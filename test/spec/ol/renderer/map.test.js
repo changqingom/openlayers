@@ -6,8 +6,13 @@ import VectorLayer from '../../../../src/ol/layer/Vector.js';
 import VectorSource from '../../../../src/ol/source/Vector.js';
 import View from '../../../../src/ol/View.js';
 import {Circle, Fill, Style} from '../../../../src/ol/style.js';
-import {Point} from '../../../../src/ol/geom.js';
+import {
+  GeometryCollection,
+  MultiPoint,
+  Point,
+} from '../../../../src/ol/geom.js';
 import {Projection} from '../../../../src/ol/proj.js';
+import {fromExtent} from '../../../../src/ol/geom/Polygon.js';
 
 describe('ol.renderer.Map', function () {
   describe('constructor', function () {
@@ -21,8 +26,71 @@ describe('ol.renderer.Map', function () {
     });
   });
 
+  describe('#forEachFeatureAtPixel', function () {
+    let map;
+    beforeEach(function () {
+      const target = document.createElement('div');
+      target.style.width = '100px';
+      target.style.height = '100px';
+      document.body.appendChild(target);
+      map = new Map({
+        target: target,
+        view: new View({
+          center: [0, 0],
+          zoom: 2,
+        }),
+      });
+    });
+    afterEach(function () {
+      document.body.removeChild(map.getTargetElement());
+      map.setTarget(null);
+    });
+    it('calls callback with feature, layer and geometry', function () {
+      let hit;
+      const point = new Point([0, 0]);
+      const polygon = fromExtent([0, -1e6, 1e6, 1e6]);
+      const geometryCollection = new Feature(
+        new GeometryCollection([polygon, point])
+      );
+      const multiPoint = new MultiPoint([
+        [-1e6, -1e6],
+        [-1e6, 1e6],
+      ]);
+      const multiGeometry = new Feature(multiPoint);
+      const layer = new VectorLayer({
+        source: new VectorSource({
+          features: [geometryCollection, multiGeometry],
+        }),
+      });
+      map.addLayer(layer);
+      map.renderSync();
+      hit = map.forEachFeatureAtPixel([50, 50], (feature, layer, geometry) => ({
+        feature,
+        layer,
+        geometry,
+      }));
+      expect(hit.feature).to.be(geometryCollection);
+      expect(hit.layer).to.be(layer);
+      expect(hit.geometry).to.be(point);
+      hit = map.forEachFeatureAtPixel([75, 50], (feature, layer, geometry) => ({
+        feature,
+        layer,
+        geometry,
+      }));
+      expect(hit.feature).to.be(geometryCollection);
+      expect(hit.geometry).to.be(polygon);
+      hit = map.forEachFeatureAtPixel([25, 25], (feature, layer, geometry) => ({
+        feature,
+        layer,
+        geometry,
+      }));
+      expect(hit.feature).to.be(multiGeometry);
+      expect(hit.geometry).to.be(multiPoint);
+    });
+  });
+
   describe('#forEachFeatureAtCoordinate', function () {
-    let map, source;
+    let map, source, style;
     beforeEach(function () {
       const target = document.createElement('div');
       target.style.width = '100px';
@@ -36,20 +104,21 @@ describe('ol.renderer.Map', function () {
         projection: projection,
         features: [new Feature(new Point([660000, 190000]))],
       });
+      style = new Style({
+        image: new Circle({
+          radius: 6,
+          fill: new Fill({
+            color: 'fuchsia',
+          }),
+        }),
+      });
       map = new Map({
         target: target,
         layers: [
           new VectorLayer({
             source: source,
             renderBuffer: 12,
-            style: new Style({
-              image: new Circle({
-                radius: 6,
-                fill: new Fill({
-                  color: 'fuchsia',
-                }),
-              }),
-            }),
+            style: style,
           }),
         ],
         view: new View({
@@ -67,6 +136,13 @@ describe('ol.renderer.Map', function () {
     });
 
     it('works with custom projection', function () {
+      map.renderSync();
+      const features = map.getFeaturesAtPixel([50, 50]);
+      expect(features.length).to.be(1);
+    });
+
+    it('works with negative image scale', function () {
+      style.getImage().setScale([-1, -1]);
       map.renderSync();
       const features = map.getFeaturesAtPixel([50, 50]);
       expect(features.length).to.be(1);

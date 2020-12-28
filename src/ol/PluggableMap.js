@@ -50,8 +50,8 @@ import {removeNode} from './dom.js';
  * @property {import("./View.js").State} viewState The state of the current view.
  * @property {boolean} animate
  * @property {import("./transform.js").Transform} coordinateToPixelTransform
+ * @property {import("rbush").default} declutterTree
  * @property {null|import("./extent.js").Extent} extent
- * @property {Array<DeclutterItems>} declutterItems
  * @property {number} index
  * @property {Array<import("./layer/Layer.js").State>} layerStatesArray
  * @property {number} layerIndex
@@ -65,12 +65,6 @@ import {removeNode} from './dom.js';
  */
 
 /**
- * @typedef {Object} DeclutterItems
- * @property {Array<*>} items Declutter items of an executor.
- * @property {number} opacity Layer opacity.
- */
-
-/**
  * @typedef {function(PluggableMap, ?FrameState): any} PostRenderFunction
  */
 
@@ -81,7 +75,7 @@ import {removeNode} from './dom.js';
  * {@link module:ol/layer/Layer layer-candidate} and it should return a boolean value.
  * Only layers which are visible and for which this function returns `true`
  * will be tested for features. By default, all visible layers will be tested.
- * @property {number} [hitTolerance=0] Hit-detection tolerance in pixels. Pixels
+ * @property {number} [hitTolerance=0] Hit-detection tolerance in css pixels. Pixels
  * inside the radius around the given position will be checked for features.
  * @property {boolean} [checkWrapped=true] Check-Wrapped Will check for for wrapped geometries inside the range of
  *   +/- 1 world width. Works only if a projection is used that can be wrapped.
@@ -130,7 +124,7 @@ import {removeNode} from './dom.js';
  * @property {HTMLElement|string} [target] The container for the map, either the
  * element itself or the `id` of the element. If not specified at construction
  * time, {@link module:ol/Map~Map#setTarget} must be called for the map to be
- * rendered.
+ * rendered. If passed by element, the container can be in a secondary document.
  * @property {View} [view] The map's view.  No layer sources will be
  * fetched unless this is specified at construction time or through
  * {@link module:ol/Map~Map#setView}.
@@ -187,7 +181,7 @@ class PluggableMap extends BaseObject {
     /**
      * @private
      */
-    this.animationDelay_ = function () {
+    this.animationDelay_ = /** @this {PluggableMap} */ function () {
       this.animationDelayKey_ = undefined;
       this.renderFrame_(Date.now());
     }.bind(this);
@@ -544,8 +538,7 @@ class PluggableMap extends BaseObject {
    * callback with each intersecting feature. Layers included in the detection can
    * be configured through the `layerFilter` option in `opt_options`.
    * @param {import("./pixel.js").Pixel} pixel Pixel.
-   * @param {function(this: S, import("./Feature.js").FeatureLike,
-   *     import("./layer/Layer.js").default): T} callback Feature callback. The callback will be
+   * @param {function(import("./Feature.js").FeatureLike, import("./layer/Layer.js").default, import("./geom/SimpleGeometry.js").default): T} callback Feature callback. The callback will be
    *     called with two arguments. The first argument is one
    *     {@link module:ol/Feature feature} or
    *     {@link module:ol/render/Feature render feature} at the pixel, the second is
@@ -565,9 +558,7 @@ class PluggableMap extends BaseObject {
     const coordinate = this.getCoordinateFromPixelInternal(pixel);
     opt_options = opt_options !== undefined ? opt_options : {};
     const hitTolerance =
-      opt_options.hitTolerance !== undefined
-        ? opt_options.hitTolerance * this.frameState_.pixelRatio
-        : 0;
+      opt_options.hitTolerance !== undefined ? opt_options.hitTolerance : 0;
     const layerFilter =
       opt_options.layerFilter !== undefined ? opt_options.layerFilter : TRUE;
     const checkWrapped = opt_options.checkWrapped !== false;
@@ -630,9 +621,7 @@ class PluggableMap extends BaseObject {
     }
     const options = opt_options || {};
     const hitTolerance =
-      options.hitTolerance !== undefined
-        ? options.hitTolerance * this.frameState_.pixelRatio
-        : 0;
+      options.hitTolerance !== undefined ? options.hitTolerance : 0;
     const layerFilter = options.layerFilter || TRUE;
     return this.renderer_.forEachLayerAtPixel(
       pixel,
@@ -660,9 +649,7 @@ class PluggableMap extends BaseObject {
     const layerFilter =
       opt_options.layerFilter !== undefined ? opt_options.layerFilter : TRUE;
     const hitTolerance =
-      opt_options.hitTolerance !== undefined
-        ? opt_options.hitTolerance * this.frameState_.pixelRatio
-        : 0;
+      opt_options.hitTolerance !== undefined ? opt_options.hitTolerance : 0;
     const checkWrapped = opt_options.checkWrapped !== false;
     return this.renderer_.hasFeatureAtCoordinate(
       coordinate,
@@ -954,6 +941,15 @@ class PluggableMap extends BaseObject {
   }
 
   /**
+   * @return {!Document} The document where the map is displayed.
+   */
+  getOwnerDocument() {
+    return this.getTargetElement()
+      ? this.getTargetElement().ownerDocument
+      : document;
+  }
+
+  /**
    * @param {import("./Tile.js").default} tile Tile.
    * @param {string} tileSourceKey Tile source key.
    * @param {import("./coordinate.js").Coordinate} tileCenter Tile center.
@@ -996,16 +992,17 @@ class PluggableMap extends BaseObject {
       eventType === EventType.WHEEL ||
       eventType === EventType.KEYDOWN
     ) {
+      const doc = this.getOwnerDocument();
       const rootNode = this.viewport_.getRootNode
         ? this.viewport_.getRootNode()
-        : document;
+        : doc;
       const target =
-        rootNode === document
-          ? /** @type {Node} */ (originalEvent.target)
-          : /** @type {ShadowRoot} */ (rootNode).elementFromPoint(
+        'host' in rootNode // ShadowRoot
+          ? /** @type {ShadowRoot} */ (rootNode).elementFromPoint(
               originalEvent.clientX,
               originalEvent.clientY
-            );
+            )
+          : /** @type {Node} */ (originalEvent.target);
       if (
         // Abort if the target is a child of the container for elements whose events are not meant
         // to be handled by map interactions.
@@ -1014,23 +1011,25 @@ class PluggableMap extends BaseObject {
         // It's possible for the target to no longer be in the page if it has been removed in an
         // event listener, this might happen in a Control that recreates it's content based on
         // user interaction either manually or via a render in something like https://reactjs.org/
-        !(rootNode === document ? document.documentElement : rootNode).contains(
-          target
-        )
+        !(rootNode === doc ? doc.documentElement : rootNode).contains(target)
       ) {
         return;
       }
     }
     mapBrowserEvent.frameState = this.frameState_;
-    const interactionsArray = this.getInteractions().getArray();
     if (this.dispatchEvent(mapBrowserEvent) !== false) {
+      const interactionsArray = this.getInteractions().getArray().slice();
       for (let i = interactionsArray.length - 1; i >= 0; i--) {
         const interaction = interactionsArray[i];
-        if (!interaction.getActive()) {
+        if (
+          interaction.getMap() !== this ||
+          !interaction.getActive() ||
+          !this.getTargetElement()
+        ) {
           continue;
         }
         const cont = interaction.handleEvent(mapBrowserEvent);
-        if (!cont) {
+        if (!cont || mapBrowserEvent.propagationStopped) {
           break;
         }
       }
@@ -1141,6 +1140,7 @@ class PluggableMap extends BaseObject {
     if (!targetElement) {
       if (this.renderer_) {
         clearTimeout(this.postRenderTimeoutHandle_);
+        this.postRenderTimeoutHandle_ = undefined;
         this.postRenderFunctions_.length = 0;
         this.renderer_.dispose();
         this.renderer_ = null;
@@ -1375,9 +1375,7 @@ class PluggableMap extends BaseObject {
       frameState = {
         animate: false,
         coordinateToPixelTransform: this.coordinateToPixelTransform_,
-        declutterItems: previousFrameState
-          ? previousFrameState.declutterItems
-          : [],
+        declutterTree: null,
         extent: getForViewAndSize(
           viewState.center,
           viewState.resolution,
@@ -1441,10 +1439,12 @@ class PluggableMap extends BaseObject {
 
     this.dispatchEvent(new MapEvent(MapEventType.POSTRENDER, this, frameState));
 
-    this.postRenderTimeoutHandle_ = setTimeout(
-      this.handlePostRender.bind(this),
-      0
-    );
+    if (!this.postRenderTimeoutHandle_) {
+      this.postRenderTimeoutHandle_ = setTimeout(() => {
+        this.postRenderTimeoutHandle_ = undefined;
+        this.handlePostRender();
+      }, 0);
+    }
   }
 
   /**

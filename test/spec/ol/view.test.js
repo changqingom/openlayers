@@ -1660,6 +1660,32 @@ describe('ol.View', function () {
     });
   });
 
+  describe('#getViewportSizeMinusPadding_()', function () {
+    let map, target;
+    beforeEach(function () {
+      target = document.createElement('div');
+      target.style.width = '200px';
+      target.style.height = '150px';
+      document.body.appendChild(target);
+      map = new Map({
+        target: target,
+      });
+    });
+    afterEach(function () {
+      map.setTarget(null);
+      document.body.removeChild(target);
+    });
+    it('same as getViewportSize_ when no padding is set', function () {
+      const size = map.getView().getViewportSizeMinusPadding_();
+      expect(size).to.eql(map.getView().getViewportSize_());
+    });
+    it('correctly updates when the padding is changed', function () {
+      map.getView().padding = [1, 2, 3, 4];
+      const size = map.getView().getViewportSizeMinusPadding_();
+      expect(size).to.eql([194, 146]);
+    });
+  });
+
   describe('fit', function () {
     const originalRequestAnimationFrame = window.requestAnimationFrame;
     const originalCancelAnimationFrame = window.cancelAnimationFrame;
@@ -1775,6 +1801,20 @@ describe('ol.View', function () {
       expect(view.getResolution()).to.be(5);
       expect(view.getCenter()[0]).to.be(1500);
       expect(view.getCenter()[1]).to.be(1500);
+    });
+    it('fits correctly to the extent when a padding is configured', function () {
+      view.padding = [100, 0, 0, 100];
+      view.setViewportSize([200, 200]);
+      view.fit([1000, 1000, 2000, 2000]);
+      expect(view.getResolution()).to.be(10);
+      expect(view.getCenter()[0]).to.be(1500);
+      expect(view.getCenter()[1]).to.be(1500);
+    });
+    it('fits correctly to the extent when a view extent is configured', function () {
+      view.options_.extent = [1500, 0, 2500, 10000];
+      view.applyOptions_(view.options_);
+      view.fit([1000, 1000, 2000, 2000]);
+      expect(view.calculateExtent()).eql([1500, 1000, 2500, 2000]);
     });
     it('throws on invalid geometry/extent value', function () {
       expect(function () {
@@ -2149,6 +2189,23 @@ describe('ol.View', function () {
       center = view.getCenter();
       expect(center[0]).to.roughlyEqual(0, 1e-10);
       expect(center[1]).to.roughlyEqual(0, 1e-10);
+    });
+  });
+
+  describe('#getState', function () {
+    let view;
+    beforeEach(function () {
+      view = new View({
+        center: [0, 0],
+        resolutions: [1],
+        zoom: 0,
+      });
+      view.setViewportSize([100, 100]);
+    });
+    it('Correctly shifts the viewport center when a padding is set', function () {
+      view.padding = [50, 0, 0, 50];
+      const state = view.getState();
+      expect(state.center).to.eql([-25, 25]);
     });
   });
 });
