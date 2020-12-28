@@ -70,6 +70,12 @@ class BuilderGroup {
      * @type {!Object<string, !Object<import("./BuilderType").default, Builder>>}
      */
     this.buildersByZIndex_ = {};
+
+    /**
+     * @private
+     * @type {import("../../layer.js").Layer}
+     */
+    this.customRenderLayer_ = null;
   }
 
   /**
@@ -131,6 +137,19 @@ class BuilderGroup {
       replays[builderType] = replay;
     }
     return replay;
+  }
+  /**
+   * @param {import("../../layer.js").Layer} layer Layer.
+   */
+  setLayer(layer) {
+    this.customRenderLayer_ = layer;
+  }
+
+  /**
+   * @return {import("../../layer.js").Layer} Layer.
+   */
+  getLayer() {
+    return this.customRenderLayer_;
   }
 }
 

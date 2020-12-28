@@ -17,6 +17,7 @@ import {getTransformFromProjections, getUserProjection} from './proj.js';
  * @property {CanvasRenderingContext2D} context Canvas context that the layer is being rendered to.
  * @property {import("./Feature.js").FeatureLike} feature
  * @property {import("./geom/SimpleGeometry.js").default} geometry
+ * @property {import("./layer.js").Layer} layer
  * @property {number} pixelRatio Pixel ratio used by the layer renderer.
  * @property {number} resolution Resolution that the render batch was created and optimized for.
  * This is not the view's resolution that is being rendered.

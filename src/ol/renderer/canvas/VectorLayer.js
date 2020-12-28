@@ -603,6 +603,8 @@ class CanvasVectorLayerRenderer extends CanvasLayerRenderer {
       vectorLayer.getDeclutter()
     );
 
+    replayGroup.setLayer(this.layer_);
+
     const userProjection = getUserProjection();
     let userTransform;
     if (userProjection) {

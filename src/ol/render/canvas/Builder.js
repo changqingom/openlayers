@@ -228,9 +228,10 @@ class CanvasBuilder extends VectorContext {
   /**
    * @param {import("../../geom/SimpleGeometry.js").default} geometry Geometry.
    * @param {import("../../Feature.js").FeatureLike} feature Feature.
+   * @param {import("../../Layer.js").Layer} layer Layer.
    * @param {Function} renderer Renderer.
    */
-  drawCustom(geometry, feature, renderer) {
+  drawCustom(geometry, feature, layer, renderer) {
     this.beginGeometry(geometry, feature);
     const type = geometry.getType();
     const stride = geometry.getStride();
@@ -257,7 +258,7 @@ class CanvasBuilder extends VectorContext {
         CanvasInstruction.CUSTOM,
         builderBegin,
         builderEndss,
-        geometry,
+        [geometry, layer],
         renderer,
         inflateMultiCoordinatesArray,
       ]);
@@ -281,7 +282,7 @@ class CanvasBuilder extends VectorContext {
         CanvasInstruction.CUSTOM,
         builderBegin,
         builderEnds,
-        geometry,
+        [geometry, layer],
         renderer,
         inflateCoordinatesArray,
       ]);
@@ -302,7 +303,7 @@ class CanvasBuilder extends VectorContext {
         CanvasInstruction.CUSTOM,
         builderBegin,
         builderEnd,
-        geometry,
+        [geometry, layer],
         renderer,
         inflateCoordinates,
       ]);
@@ -314,7 +315,7 @@ class CanvasBuilder extends VectorContext {
         CanvasInstruction.CUSTOM,
         builderBegin,
         builderEnd,
-        geometry,
+        [geometry, layer],
         renderer,
       ]);
     }

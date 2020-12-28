@@ -14,9 +14,10 @@ class VectorContext {
    *
    * @param {import("../geom/SimpleGeometry.js").default} geometry Geometry.
    * @param {import("../Feature.js").FeatureLike} feature Feature.
+   * @param {import("../Layer.js").Layer} layer Layer.
    * @param {Function} renderer Renderer.
    */
-  drawCustom(geometry, feature, renderer) {}
+  drawCustom(geometry, feature, layer, renderer) {}
 
   /**
    * Render a geometry.

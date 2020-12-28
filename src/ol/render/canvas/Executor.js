@@ -763,11 +763,15 @@ class Executor {
         case CanvasInstruction.CUSTOM:
           d = /** @type {number} */ (instruction[1]);
           dd = instruction[2];
-          const geometry = /** @type {import("../../geom/SimpleGeometry.js").default} */ (instruction[3]);
+          const [
+            geometry,
+            layer,
+          ] = /** @type {import("../../geom/SimpleGeometry.js").default} */ (instruction[3]);
           const renderer = instruction[4];
           const fn = instruction.length == 6 ? instruction[5] : undefined;
           state.geometry = geometry;
           state.feature = feature;
+          state.layer = layer;
           if (!(i in coordinateCache)) {
             coordinateCache[i] = [];
           }

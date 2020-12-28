@@ -178,6 +178,7 @@ function renderGeometry(replayGroup, geometry, style, feature) {
   replay.drawCustom(
     /** @type {import("../geom/SimpleGeometry.js").default} */ (geometry),
     feature,
+    replayGroup.getLayer(),
     style.getRenderer()
   );
 }
